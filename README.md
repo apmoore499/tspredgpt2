@@ -10,8 +10,8 @@ $$
 
 where:
 
-- $$ X \in \mathcal{X} \subset \mathbb{R}^{1024 \times F} $$ represents a sequence of length 1024 (i.e., 1024 time steps) with $$ F $$ features at each time step.
-- $$ Y \in \{0, 1\} $ is the binary label, where $ Y = 1 $$ indicates that the closing price at time $$ t+1 $$ is greater than the closing price at time $$ t $$, i.e., $$ \text{close}[t+1] > \text{close}[t] $$.
+- $$X \in \mathcal{X} \subset \mathbb{R}^{1024 \times F}$$ represents a sequence of length 1024 (i.e., 1024 time steps) with $$F$$ features at each time step.
+- $$Y \in \{0, 1\}$$ is the binary label, where $$Y = 1$$ indicates that the closing price at time $$t+1$$ is greater than the closing price at time $$t$$, i.e., $$\text{close}[t+1] > \text{close}[t]$$.
 
 In this setup, the model predicts the direction of price change based on a sliding window of past observations.
 
