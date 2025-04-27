@@ -1,11 +1,20 @@
-Simple implementation of a financial forecasting model based on a pretrained GPT-2 backbone.
+Simple financial forecasting model based on a pretrained GPT-2 backbone.
 
-Given a time series dataset consisting of OHLCV observations, the goal is to anticipate the future direction of price change.
+Given a time series dataset consisting of OHLCV observations, we consider a forecasting objective to anticipate the future direction of price change.
+
+Each
 
 Simply, the model learns a mapping:
 
 
-$f: X \rightarrow Y, X\in[1024,F],Y\in\{0,1}$
+$f: \mathcal{X} \rightarrow \mathcal{Y}$ 
+
+Where each $X\in\mathcal{X} \subset [1024,F]
+
+And $Y\in\{0,1}$
+
+
+Where 
 
 Using pytorch / lightning.
 
