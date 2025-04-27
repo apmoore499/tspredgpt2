@@ -1,6 +1,6 @@
 # Financial Forecasting Model Based on Pretrained GPT-2 Backbone
 
-We are building a simple financial forecasting model based on a pretrained GPT-2 backbone. Given a time series dataset consisting of OHLCV observations, the objective is to forecast the future direction of price change.
+In this project, we build a financial forecasting model based on a pretrained GPT-2 backbone. Given a time series dataset consisting of OHLCV observations, the objective is to forecast the future direction of price change.
 
 The model learns a mapping:
 
@@ -15,8 +15,13 @@ where:
 
 In this setup, the model predicts the direction of price change based on a sliding window of past observations.
 
+The training is feasible on a single 4090.
+
+
+
 # List of tasks to do:
 
 - Causal attention mask                      []
 - Scaling to higher n GPU                    []
 - Verifying effect of smaller time window    []
+- Integrating with backtest                  []
