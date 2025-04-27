@@ -19,9 +19,8 @@ The training is feasible on a single 4090.
 
 
 
-# List of tasks to do:
+# Further avenues of exploration:
 
-- Causal attention mask                      []
-- Scaling to higher n GPU                    []
-- Verifying effect of smaller time window    []
-- Integrating with backtest                  []
+- Scaling to higher n GPU, with more data                    []
+- Verifying effect of smaller time window                    []
+- Integrating with backtest                                  []
