@@ -156,7 +156,8 @@ class GPT2TimeSeriesModel(pl.LightningModule):
         # Project to GPT-2 embedding space
         x = self.input_projection(x)
 
-        attention_mask = (x != 0).any(dim=2).long()
+        attention_mask = (x != 0).any(dim=2).long() #nb attention mask should be causal by default
+                                                    # https://discuss.pytorch.org/t/huggingfaces-gpt2-implement-causal-attention/74984
 
 
         gpt2_output = self.gpt2(inputs_embeds=x, attention_mask=attention_mask)
