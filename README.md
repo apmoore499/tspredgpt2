@@ -1,21 +1,22 @@
-Simple financial forecasting model based on a pretrained GPT-2 backbone.
+# Financial Forecasting Model Based on Pretrained GPT-2 Backbone
 
-Given a time series dataset consisting of OHLCV observations, we consider a forecasting objective to anticipate the future direction of price change.
+We are building a simple financial forecasting model based on a pretrained GPT-2 backbone. Given a time series dataset consisting of OHLCV observations, the objective is to forecast the future direction of price change.
 
-Each
+The model learns a mapping:
 
-Simply, the model learns a mapping:
+$$
+f: \mathcal{X} \rightarrow \mathcal{Y}
+$$
 
+where:
 
-$f: \mathcal{X} \rightarrow \mathcal{Y}$ 
+- \( X \in \mathcal{X} \subset \mathbb{R}^{1024 \times F} \) represents a sequence of length 1024 (i.e., 1024 time steps) with \( F \) features at each time step.
+- \( Y \in \{0, 1\} \) is the binary label, where \( Y = 1 \) indicates that the closing price at time \( t+1 \) is greater than the closing price at time \( t \), i.e., \( \text{close}[t+1] > \text{close}[t] \).
 
-Where each $X\in\mathcal{X} \subset [1024,F]
+In this setup, the model predicts the direction of price change based on a sliding window of past observations.
 
-And $Y\in\{0,1}$
+# List of tasks to do:
 
-
-Where 
-
-Using pytorch / lightning.
-
-
+- Causal attention mask                      []
+- Scaling to higher n GPU                    []
+- Verifying effect of smaller time window    []
