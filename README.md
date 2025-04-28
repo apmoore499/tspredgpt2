@@ -15,6 +15,13 @@ where:
 
 In this setup, the model predicts the direction of price change based on a sliding window of past observations.
 
+## Base Model
+Pretrained GPT2 from Hugging Face
+
+https://huggingface.co/docs/transformers/en/model_doc/gpt2#using-flash-attention-2
+
+
+
 
 ## Training Data
 The dataset used for experiments consists of minute bars of SPY ETF observations, from 2005 to 2024. The minute bars are aggregated to 3-hourly windows.
@@ -39,3 +46,6 @@ The training is feasible on a single 4090.
 - Scaling to higher n GPU, with more data                    []
 - Verifying effect of smaller time window                    []
 - Integrating with backtest                                  []
+
+
+
