@@ -3,16 +3,19 @@
 # torch model definitions
 
 
+import matplotlib.pyplot as plt
+import pytorch_lightning as pl
+import seaborn as sns
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from torch.optim import AdamW
-
-import pytorch_lightning as pl
-from transformers import GPT2Model, GPT2Config
 import torch.nn.functional as F
-from data import add_fourier_features
+from sklearn.metrics import confusion_matrix, precision_recall_curve
+from torch.optim import AdamW
+from torch.utils.data import DataLoader, Dataset
+from torchmetrics.functional import average_precision
+from transformers import GPT2Config, GPT2Model
 
+from data import add_fourier_features
 
 # --- Define which pretrained model to use ---
 # Choose one of the standard GPT-2 models.
@@ -103,15 +106,17 @@ class GPT2TimeSeriesModel(pl.LightningModule):
         # --- Adapt the decoder layer ---
         # It must take the pretrained model's embedding size (e.g., 768) as input
         self.decoder = nn.Sequential(
-            nn.Linear(pretrained_n_embd, 512), # Start with the pretrained embedding size
+            nn.Linear(pretrained_n_embd, 256), # Start with the pretrained embedding size
             nn.SiLU(),
-            nn.LayerNorm(512),
-            nn.Dropout(0.1),
-            nn.Linear(512, 256),
+            nn.LayerNorm(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, 32),
             nn.SiLU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, num_classes)
+            nn.Dropout(0.3),
+            nn.Linear(32, num_classes)
             )
+
+        #self.decoder=nn.Linear(pretrained_n_embd,num_classes)
 
         self.input_decoder_params=list(self.input_projection.parameters())+list(self.decoder.parameters())
 
@@ -184,6 +189,11 @@ class GPT2TimeSeriesModel(pl.LightningModule):
         self.log('train_acc', acc, prog_bar=True,on_epoch=True)
         return loss
 
+    def on_validation_epoch_start(self):
+        # Initialize containers
+        self.val_preds = []
+        self.val_targets = []
+
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
@@ -193,7 +203,58 @@ class GPT2TimeSeriesModel(pl.LightningModule):
         acc = (y_hat.argmax(dim=1) == y).float().mean()
         self.log('val_loss', loss, prog_bar=True) # Add prog_bar=True for visibility
         self.log('val_acc', acc, prog_bar=True,on_epoch=True)
+
+        # Save predictions and targets
+        preds = y_hat.argmax(dim=1)
+        self.val_preds.append(y_hat.detach().cpu())
+        self.val_targets.append(y.detach().cpu())
+
+
         return loss
+
+
+
+
+    def on_validation_epoch_end(self):
+        preds = torch.cat(self.val_preds)
+        targets = torch.cat(self.val_targets)
+
+        # Confusion matrix
+        cm = confusion_matrix(targets.numpy(), preds.argmax(dim=1).numpy())
+
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('True')
+        ax.set_title('Confusion Matrix')
+
+        self.logger.experiment.add_figure('Confusion Matrix', fig, global_step=self.current_epoch)
+        plt.close(fig)
+
+        # Precision-Recall curve
+        if len(torch.unique(targets)) == 2:  # binary classification
+            # You need probabilities for PR curve (not predicted classes)
+            probs = torch.cat(self.val_probs) if hasattr(self, 'val_probs') else preds.float()  # simple fallback
+
+            # Or better: recompute probs properly
+            # Assuming self.val_probs are not stored, let's recompute it:
+            all_probs = torch.softmax(probs, dim=1)[:, 1]  # get positive class prob
+            all_probs = all_probs.detach().cpu()
+
+            precision, recall, _ = precision_recall_curve(targets.numpy(), all_probs.numpy())
+
+            # Plot
+            fig2, ax2 = plt.subplots()
+            ax2.plot(recall, precision, marker='.')
+            ax2.set_xlabel('Recall')
+            ax2.set_ylabel('Precision')
+            ax2.set_title('Precision-Recall Curve')
+            self.logger.experiment.add_figure('Precision-Recall Curve', fig2, global_step=self.current_epoch)
+            plt.close(fig2)
+
+            # AUPRC
+            auprc = average_precision(all_probs, targets,task="binary")
+            self.log('val_auprc', auprc, prog_bar=True, on_epoch=True)
 
 
     def test_step(self, batch, batch_idx):

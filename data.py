@@ -13,6 +13,8 @@ from talib import MA_Type
 
 import tqdm
 
+GPT2TS_DIR=os.getenv('GPT2TS_DIR')
+GPT2TS_DIR=pathlib.Path(GPT2TS_DIR)
 
 
 def generate_synthetic_data(n_samples=20000, seq_length=512):
@@ -151,7 +153,8 @@ class FastLMDBDataset(Dataset):
 
 def get_lmdb_path(prefix):
 
-    return f"/media/krillman/DISK3_1TB/llama_install/transformer_fx_prediction/code_gpt2_ts/data/{prefix}_dataset.lmdb"
+    
+    return GPT2TS_DIR.joinpath(f"data/{prefix}_dataset.lmdb").as_posix()
 
 
 
@@ -166,8 +169,8 @@ def save_lmdb_dset(dataset,prefix):
     # Loader (batch_size=1 to get single samples)
     loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
 
-    # Create LMDB environment
-    map_size = int(2e9)  # Adjust as needed
+
+    map_size = int(20e9)  # Adjust as needed
     lmdb_path=get_lmdb_path(prefix)
     env = lmdb.open(lmdb_path, map_size=map_size)
 
@@ -242,39 +245,61 @@ def return_formatted_SPY_data(seq_length,resample_interval='10min',data_fn='pric
     #outcome variable for prediction
     #predicting if close[t+1]>close[t]
     next_close_increase=(df.close.diff(1)>0)*1.0
+    next_close_increase=next_close_increase.shift(-1)
+
+    #breakpoint()
+
+    #df.close.diff(1)[1:]
 
     df=df.ffill() # ffill missing prices
 
     #seq_length=1024
 
     df=df[df.volume!=0]#.iloc[seq_length:] #start from first 1024 samples
-    ts=np.array([o.total_seconds()/60/10 for o in df.index.diff(1).tolist()])
-    df=df.pct_change()#.dropna()
+    
+    zscore_cols=['open', 'high', 'low', 'close', 'volume', 'upper', 'middle', 'lower',
+       'sma_25', 'sma_150', 'atr_1D', 'atr_10D']
 
-    df['time']=ts
+    df[zscore_cols]=df[zscore_cols].pct_change()#.dropna()
+
     df['next_close_increase']=next_close_increase
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     df=df.dropna()
+    df=df.iloc[30*5:]
+
+    ts=np.array([o.total_seconds()/60/10 for o in df.index.diff(1).tolist()])
+    df['time']=ts
+    df['time']=df['time'].shift(-1)
+    df=df.dropna()
+
+
+    c=[c for c in df.columns if c!='next_close_increase']
+
+    df=df[c+['next_close_increase']]
+
+
 
     print('example df with indicators and next_close_increase outcome variable')
     print(df.head(5))
 
 
+    #breakpoint()
+
 
     df=df.reset_index(drop=True).dropna()
+
+    #print(df.head(5))
+
 
     #breakpoint()
 
 
     #30*5
-    df=df.iloc[30*5:]
+    
     #df=df.iloc[:seq_length+seq_length*N_WINDOWS] #subset the data, otherwise too muchh to fit on single gpu
 
 
-    features_shape=df.iloc[:seq_length,:-1].values.shape
 
-    features_array=np.zeros((df.shape[0]-seq_length,*features_shape))#.astype(np.float16)
-    labels_array=np.zeros(df.shape[0]-seq_length)#.astype(np.float16)
 
     zscore_cols=['open', 'high', 'low', 'close', 'volume', 'upper', 'middle', 'lower',
        'sma_25', 'sma_150', 'atr_1D', 'atr_10D']
@@ -282,9 +307,20 @@ def return_formatted_SPY_data(seq_length,resample_interval='10min',data_fn='pric
     df[zscore_cols]=df[zscore_cols].apply(zscore)
 
 
+
+    df=df[['close','sma_25','sma_150','atr_1D','atr_10D','sma_cross','next_close_increase']]
+
+
+    features_shape=df.iloc[:seq_length,:-1].values.shape
+
+    features_array=np.zeros((df.shape[0]-seq_length,*features_shape))#.astype(np.float16)
+    labels_array=np.zeros(df.shape[0]-seq_length)#.astype(np.float16)
+
+
     for i in tqdm.tqdm(range(df.shape[0]-seq_length)):
         feats=df.iloc[i:i+seq_length,:-1].values#.astype(np.float16)
         labels=df.iloc[i+seq_length:i+seq_length+1,-1].values#.astype(np.int32)
+        #breakpoint()
         features_array[i]=feats
         labels_array[i]=labels
 
@@ -295,19 +331,13 @@ def return_formatted_SPY_data(seq_length,resample_interval='10min',data_fn='pric
 
     print(f'features shape: {features.shape}')
     print(f'labels shape: {labels.shape}')
+    print(f'labels mean: {labels.float().mean()}')
 
 
-    one_idx=np.where(labels)[0].flatten()
-    zero_idx=np.array([i for i in np.arange(labels.shape[0]) if i not in one_idx]).flatten()
 
-    n_one=len(one_idx)
-    n_zero=len(zero_idx)
-    to_sel=min(n_one,n_zero)
-    together=np.hstack([one_idx[:to_sel],zero_idx[:to_sel]]).flatten()
-    together.sort()
 
-    features=features[together]
-    labels=labels[together]
+    #features=features[together]
+    #labels=labels[together]
 
     N_obs=len(features)
 
@@ -330,13 +360,58 @@ def return_formatted_SPY_data(seq_length,resample_interval='10min',data_fn='pric
     features=features.float()
     labels=labels.long()
 
-    #breakpoint()
 
-    train_dataset = TimeSeriesDataset(features[train_idx], labels[train_idx], seq_length)
-    val_dataset = TimeSeriesDataset(features[val_idx], labels[val_idx], seq_length)
-    test_dataset = TimeSeriesDataset(features[test_idx], labels[test_idx], seq_length)
+    #get labels and make sure even
+
+    train_labels=labels[train_idx]
+    train_features=features[train_idx]
+    train_balanced_lab=return_balanced_label_idx(train_labels)
+    train_labels=train_labels[train_balanced_lab]
+    train_features=train_features[train_balanced_lab]
+
+
+    val_labels=labels[val_idx]
+    val_features=features[val_idx]
+    val_balanced_lab=return_balanced_label_idx(val_labels)
+    val_labels=val_labels[val_balanced_lab]
+    val_features=val_features[val_balanced_lab]
+
+
+    test_labels=labels[test_idx]
+    test_features=features[test_idx]
+    test_balanced_lab=return_balanced_label_idx(test_labels)
+    test_labels=test_labels[test_balanced_lab]
+    test_features=test_features[test_balanced_lab]
+
+
+    print(f'mean train label: {train_labels.float().mean()}')
+    print(f'mean val label: {val_labels.float().mean()}')
+    print(f'mean test label: {test_labels.float().mean()}')
+
+    print(f'n train label: {train_labels.shape[0]}')
+    print(f'n val label: {val_labels.shape[0]}')
+    print(f'n test label: {test_labels.shape[0]}')
+
+    train_dataset = TimeSeriesDataset(train_features, train_labels, seq_length)
+    val_dataset = TimeSeriesDataset(val_features, val_labels, seq_length)
+    test_dataset = TimeSeriesDataset(test_features, test_labels, seq_length)
+
+
 
     return train_dataset,val_dataset,test_dataset
 
 
 
+def return_balanced_label_idx(labels):
+
+    one_idx=np.where(labels)[0].flatten()
+    zero_idx=np.array([i for i in np.arange(labels.shape[0]) if i not in one_idx]).flatten()
+
+    n_one=len(one_idx)
+    n_zero=len(zero_idx)
+    to_sel=min(n_one,n_zero)
+    together=np.hstack([one_idx[:to_sel],zero_idx[:to_sel]]).flatten()
+    together.sort()
+    print(f'n cases balanced: {to_sel}')
+    print(f'len together: {len(together)}')
+    return together

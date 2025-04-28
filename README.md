@@ -33,12 +33,18 @@ Talib library is used to augment the raw data with some common financial indicat
 - Average True Range (ATR) values of the price series, with varying window length.
 - Bollinger Bands.
 
-In some sense, we can think of these derived indicators as providing more signal regarding the price momentum which could be used to anticipate subsequent price behaviour.
+In some sense, we can think of these derived indicators as providing more signal regarding the price momentum which could be used to anticipate subsequent price behaviour. They constitute a knowledge-driven inductive bias.
+
+## Using Pretrained GPT-2
+
+One hopes transfer learning.
 
 
 
 ## Training
-The training is feasible on a single 4090.
+The training is feasible on a single 4090. Howwever RAM is maxing out at 46GB, ~4 iterations per second with batch size of 16. There is little CPU utilisation:
+
+Indicating the presence of some bottleneck. Nonetheless, this seems okay for a proof of concept project.
 
 
 # Further avenues of exploration:
