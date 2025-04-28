@@ -20,10 +20,7 @@ from transformers import GPT2Config, GPT2Model
 
 torch.set_float32_matmul_precision('medium') #go faster on 4090
 
-
-GPT2TS_DIR=os.getenv('GPT2TS_DIR')
-#setting local dir...
-GPT2TS_DIR=pathlib.Path(GPT2TS_DIR)
+from data import GPT2TS_DIR
 
 
 import pathlib
